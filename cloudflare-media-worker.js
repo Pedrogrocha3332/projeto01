@@ -26,7 +26,7 @@ export default {
     }
 
     // Host de origem do Supabase (configurável via env ou fallback)
-    const supabaseHost = env?.SUPABASE_ORIGIN_HOST || "YOUR_SUPABASE_ID.supabase.co";
+    const supabaseHost = env?.SUPABASE_ORIGIN_HOST || "nrokcurppdvhbadpigql.supabase.co";
 
     // Reescreve a URL preservando o caminho assinado original (/storage/v1/object/sign/media/...)
     const targetUrl = new URL(request.url);
