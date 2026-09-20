@@ -82,7 +82,16 @@ function MediaPage() {
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchInterval: (query) => {
+      const data = (query.state.data as any[]) ?? [];
+      const hasPending = data.some(
+        (a) => a.media_kind === "video" &&
+        (a.tags?.includes("pendente_camuflagem") || a.tags?.includes("processando_camuflagem"))
+      );
+      return hasPending ? 3000 : false;
+    },
   });
+
 
   const accountAssets = assets.filter(a => {
     if (a.media_kind !== "video" || accountId === "all") return true;
@@ -203,8 +212,10 @@ function MediaPage() {
           mime_type: file.type || (detected === "video" ? "video/mp4" : "image/jpeg"),
           media_kind: kind,
           ig_account_id: null,
+          tags: detected === "video" ? ["pendente_camuflagem"] : ["pronto", "camuflado"],
           ...(detected === "video" ? { folder_id: uploadAccount } : {}),
           size_bytes: file.size,
+
           width, height, duration_seconds: duration,
           thumbnail_path: thumbPath,
           thumbnail_url: thumbUrl,
@@ -332,6 +343,20 @@ function MediaPage() {
           </div>
         )}
 
+        {counts.video > 0 && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold">
+                {assets.filter(a => a.media_kind === "video" && (a.tags?.includes("pronto") || a.tags?.includes("camuflado") || !a.tags || a.tags.length === 0)).length} de {counts.video} vídeos camuflados e 100% prontos para os Pools
+              </span>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              Anti-PDQ Hash, I-Frames zerados & Trend Hijacking ativos na VPS
+            </span>
+          </div>
+        )}
+
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {tabs.map((t) => {
             const Icon = t.icon;
@@ -364,6 +389,8 @@ function MediaPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {visibleAssets.map((a, index) => {
               const isVideo = a.media_kind === "video";
+              const isCamuflando = isVideo && (a.tags?.includes("pendente_camuflagem") || a.tags?.includes("processando_camuflagem"));
+              const isPronto = isVideo && !isCamuflando;
               const reelWarnings = isVideo
                 ? validateReel({
                     meta: a.width && a.height ? { width: a.width, height: a.height, duration: Number(a.duration_seconds ?? 0) } : null,
@@ -386,10 +413,24 @@ function MediaPage() {
                 }`}>
                   {isVideo ? (accounts.find(folder => folder.id === a.folder_id)?.name ?? "Sem pasta") : a.media_kind === "cover" ? "Capa" : "Foto"}
                 </span>
-                {isVideo && hasIssue && (
+
+                {isVideo && (
+                  <span
+                    className={`absolute right-1.5 top-1.5 flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                      isCamuflando
+                        ? "bg-amber-500 text-black animate-pulse shadow-sm"
+                        : "bg-emerald-600 text-white shadow-sm"
+                    }`}
+                    title={isCamuflando ? "Processando camuflagem na VPS Contabo..." : "Vídeo 100% camuflado e pronto para o Pool"}
+                  >
+                    {isCamuflando ? "🟡 Camuflando..." : "🟢 Pronto para Pool"}
+                  </span>
+                )}
+
+                {isVideo && hasIssue && !isCamuflando && (
                   <span
                     title={reelWarnings.map((w) => w.message).join("\n")}
-                    className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-medium text-black"
+                    className="absolute right-1.5 top-7 flex items-center gap-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-medium text-black"
                   >
                     <AlertTriangle className="h-3 w-3" /> Reel
                   </span>
@@ -399,6 +440,7 @@ function MediaPage() {
                     {formatDuration(Number(a.duration_seconds))}
                   </span>
                 )}
+
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
                   <div className="flex items-center justify-between gap-1 text-[10px] text-white">
                     <span className="line-clamp-2 break-all flex-1">{a.file_name}</span>
