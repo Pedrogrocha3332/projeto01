@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import {
-  LayoutDashboard, ListChecks, PenSquare, BarChart3,
+  LayoutDashboard, ListChecks, PenSquare,
   Image as ImageIcon, Instagram, Menu, X, LogOut, KeyRound, Repeat,
+  ChevronDown, ChevronUp, Send,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsAdminPrincipal } from "@/hooks/use-role";
@@ -20,19 +21,24 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-const NAV = [
-  { to: "/dashboard", label: "Painel", icon: LayoutDashboard },
-  { to: "/pools", label: "Pools de Rotação", icon: Repeat, accent: true },
+const POSTAGEM_ITEMS = [
   { to: "/rounds", label: "Publicação em rodadas", icon: ListChecks },
   { to: "/compose", label: "Nova publicação", icon: PenSquare },
+] as const;
+
+const PRIMARY_TOP = [
+  { to: "/dashboard", label: "Painel", icon: LayoutDashboard },
+  { to: "/pools", label: "Pools de Rotação", icon: Repeat, accent: true },
+] as const;
+
+const PRIMARY_BOTTOM = [
   { to: "/queue", label: "Fila", icon: ListChecks },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/media", label: "Biblioteca", icon: ImageIcon },
-  { to: "/import-center", label: "Central de envio", icon: ImageIcon },
-  { to: "/accounts", label: "Contas do Instagram", icon: Instagram },
 ] as const;
 
 const SECONDARY = [
+  { to: "/accounts", label: "Contas do Instagram", icon: Instagram },
+  { to: "/import-center", label: "Central de envio", icon: ImageIcon },
   { to: "/meta-api", label: "Meta API", icon: KeyRound },
 ] as const;
 
@@ -40,11 +46,14 @@ function AuthenticatedLayout() {
   const { user } = Route.useRouteContext() as { user: User };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [postagemOpen, setPostagemOpen] = useState(true);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdminPrincipal } = useIsAdminPrincipal();
   useRealtimeSync();
+
+  const isPostagemActive = pathname.startsWith("/rounds") || pathname.startsWith("/compose");
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
@@ -57,40 +66,102 @@ function AuthenticatedLayout() {
 
   type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; accent?: boolean };
 
-  const NavItems = ({ items, label }: { items: readonly NavItem[]; label?: string }) => (
-    <nav className="space-y-1.5" aria-label={label || "Navegação"}>
-      {items.map((item) => {
-        const active = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
-        const isAccent = item.accent;
-        return (
-          <Link
-            key={item.to}
-            to={item.to}
-            aria-current={active ? "page" : undefined}
-            title={collapsed ? item.label : undefined}
-            className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#09090B] ${
-              active
-                ? "bg-[#09090B] text-white font-semibold shadow-xs"
-                : isAccent
-                ? "bg-[#F4F4F6] text-[#09090B] border border-[#E5E5EA] hover:bg-[#EAEAEA] font-semibold"
+  const RenderNavLink = ({ item, isSub = false }: { item: NavItem; isSub?: boolean }) => {
+    const active = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
+    const isAccent = item.accent;
+    return (
+      <Link
+        key={item.to}
+        to={item.to}
+        aria-current={active ? "page" : undefined}
+        title={collapsed ? item.label : undefined}
+        className={`group relative flex items-center gap-3 rounded-xl transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#09090B] ${
+          isSub ? "px-2.5 py-2 text-xs" : "px-3 py-2.5 text-sm"
+        } font-medium ${
+          active
+            ? "bg-[#09090B] text-[#E5B842] border border-[#E5B842]/30 font-semibold shadow-xs"
+            : isAccent
+            ? "bg-[#F4F4F6] text-[#09090B] border border-[#E5E5EA] hover:bg-[#EAEAEA] font-semibold"
+            : "text-[#344054] hover:bg-[#F2F4F7] hover:text-[#101828]"
+        }`}
+      >
+        <item.icon
+          className={`${isSub ? "h-4 w-4" : "h-4.5 w-4.5"} shrink-0 transition-transform duration-150 group-hover:scale-105 ${
+            active ? "text-[#E5B842]" : isAccent ? "text-[#09090B]" : "text-[#667085] group-hover:text-[#101828]"
+          }`}
+          aria-hidden="true"
+        />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+      </Link>
+    );
+  };
+
+  const NavContent = () => (
+    <div className="space-y-4">
+      {/* Itens Superiores (Painel, Pools de Rotação) */}
+      <nav className="space-y-1.5" aria-label="Navegação principal">
+        {PRIMARY_TOP.map((item) => (
+          <RenderNavLink key={item.to} item={item} />
+        ))}
+
+        {/* Grupo Retrátil Postagem */}
+        <div className="space-y-1 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setPostagemOpen((v) => !v)}
+            title={collapsed ? "Postagem" : undefined}
+            className={`group relative flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#09090B] ${
+              isPostagemActive && !postagemOpen
+                ? "bg-[#09090B] text-[#E5B842] border border-[#E5B842]/30 font-semibold shadow-xs"
                 : "text-[#344054] hover:bg-[#F2F4F7] hover:text-[#101828]"
             }`}
           >
-            <item.icon
-              className={`h-4.5 w-4.5 shrink-0 transition-transform duration-150 group-hover:scale-105 ${
-                active ? "text-white" : isAccent ? "text-[#09090B]" : "text-[#667085] group-hover:text-[#101828]"
-              }`}
-              aria-hidden="true"
-            />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+            <div className="flex items-center gap-3 min-w-0">
+              <Send
+                className={`h-4.5 w-4.5 shrink-0 transition-transform duration-150 group-hover:scale-105 ${
+                  isPostagemActive && !postagemOpen ? "text-[#E5B842]" : "text-[#667085] group-hover:text-[#101828]"
+                }`}
+                aria-hidden="true"
+              />
+              {!collapsed && <span className="truncate">Postagem</span>}
+            </div>
+            {!collapsed && (
+              <span className="text-[#98A2B3] group-hover:text-[#101828]">
+                {postagemOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </span>
+            )}
+          </button>
 
-  const primaryItems: NavItem[] = [...NAV];
-  const secondaryItems: NavItem[] = [...SECONDARY];
+          {(postagemOpen || collapsed) && (
+            <div className={`${collapsed ? "space-y-1 pt-1" : "pl-3 ml-3 border-l-2 border-[#E5E5EA] space-y-1 my-1"}`}>
+              {POSTAGEM_ITEMS.map((item) => (
+                <RenderNavLink key={item.to} item={item} isSub={!collapsed} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Itens Inferiores (Fila, Biblioteca) */}
+        {PRIMARY_BOTTOM.map((item) => (
+          <RenderNavLink key={item.to} item={item} />
+        ))}
+      </nav>
+
+      {/* Seção Configuração */}
+      <div className="pt-3 border-t border-[#EAECF0]">
+        {!collapsed && (
+          <div className="px-3 pb-2 text-[10.5px] font-bold uppercase tracking-wider text-[#98A2B3]">
+            Configuração
+          </div>
+        )}
+        <nav className="space-y-1.5" aria-label="Configurações">
+          {SECONDARY.map((item) => (
+            <RenderNavLink key={item.to} item={item} />
+          ))}
+        </nav>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
@@ -142,16 +213,8 @@ function AuthenticatedLayout() {
             </>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-          <NavItems items={primaryItems} label="Navegação principal" />
-          <div className="pt-3 border-t border-[#EAECF0]">
-            {!collapsed && (
-              <div className="px-3 pb-2 text-[10.5px] font-bold uppercase tracking-wider text-[#98A2B3]">
-                Configuração
-              </div>
-            )}
-            <NavItems items={secondaryItems} label="Configurações" />
-          </div>
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          <NavContent />
         </div>
 
         {/* User Profile Footer */}
@@ -255,14 +318,8 @@ function AuthenticatedLayout() {
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-              <NavItems items={primaryItems} label="Navegação principal" />
-              <div className="pt-3 border-t border-[#EAECF0]">
-                <div className="px-3 pb-2 text-[10.5px] font-bold uppercase tracking-wider text-[#98A2B3]">
-                  Integração
-                </div>
-                <NavItems items={secondaryItems} label="Integrações" />
-              </div>
+            <div className="flex-1 overflow-y-auto px-3 py-4">
+              <NavContent />
             </div>
             <div className="border-t border-[#EAECF0] p-3 bg-white">
               <div className="flex items-center gap-2.5 rounded-xl p-1.5">

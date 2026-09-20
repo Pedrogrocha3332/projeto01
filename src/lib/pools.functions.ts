@@ -237,10 +237,29 @@ export const runPoolNow = createServerFn({ method: "POST" })
     // Verifica dono
     const { data: pool, error } = await context.supabase
       .from("media_pools")
-      .select("id")
+      .select("id, ig_account_id, last_batch_at")
       .eq("id", data.id)
       .single();
     if (error || !pool) throw new Error("Pool não encontrado");
+
+    // Trava de segurança: impede disparo se a conta estiver suspensa ou restrita
+    const { data: acc } = await context.supabase
+      .from("instagram_accounts")
+      .select("id, is_restricted, is_active")
+      .eq("id", pool.ig_account_id)
+      .maybeSingle();
+    if (acc?.is_restricted || acc?.is_active === false) {
+      throw new Error("Esta conta está restrita/suspensa pela Meta. O disparo foi bloqueado pelo Circuit Breaker.");
+    }
+
+    // Cooldown de segurança (evita duplo clique acidental gerando 2 lotes seguidos)
+    if (pool.last_batch_at) {
+      const diffMs = Date.now() - new Date(pool.last_batch_at).getTime();
+      if (diffMs < 10_000) {
+        throw new Error("Aguarde alguns segundos antes de disparar outro lote para a mesma conta.");
+      }
+    }
+
     const { processPoolTick } = await import("./pools.server");
     // Força: zera next_batch_at para agora e processa
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

@@ -239,6 +239,21 @@ export async function processPoolTick(poolId: string): Promise<{ action: string;
   if (error || !pool) throw new Error(`Pool não encontrado: ${poolId}`);
   if (pool.status !== "active") return { action: "paused" };
 
+  // Blindagem de segurança: verifica se a conta do Instagram está suspensa/restrita
+  const { data: acc } = await supabaseAdmin
+    .from("instagram_accounts")
+    .select("id, is_restricted, is_active")
+    .eq("id", pool.ig_account_id)
+    .maybeSingle();
+
+  if (acc?.is_restricted || acc?.is_active === false) {
+    await supabaseAdmin
+      .from("media_pools")
+      .update({ status: "paused", next_batch_at: null })
+      .eq("id", pool.id);
+    return { action: "account_restricted" };
+  }
+
   if (Math.max(pool.reels_reserved ?? 0, pool.reels_published) >= (pool.reel_limit ?? 40)) {
     const { error: pauseError } = await supabaseAdmin.from("media_pools").update({ status: "paused", next_batch_at: null }).eq("id", pool.id);
     if (pauseError) throw pauseError;

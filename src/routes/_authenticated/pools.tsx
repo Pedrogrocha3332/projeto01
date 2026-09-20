@@ -1,10 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageBody, EmptyState, GradientButton } from "@/components/app/page";
-import { Repeat, Plus, Play, Pause, Trash2, Film, Send, X, Clock, ChevronDown, ChevronUp, Search, ExternalLink, CheckCircle2, AlertCircle, Loader2, MessageSquare, Lock } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  Repeat, Plus, Play, Pause, Trash2, Film, Send, X, Clock, ChevronDown, ChevronUp,
+  Search, ExternalLink, CheckCircle2, AlertCircle, Loader2, MessageSquare, Lock,
+  ArrowUpRight, AlertTriangle
+} from "lucide-react";
+import { useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -138,45 +142,343 @@ function PoolsPage() {
     mutationFn: async (id: string) => await runFn({ data: { id } }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["media-pools"] });
+      qc.invalidateQueries({ queryKey: ["pools-header-stats"] });
       toast.success(r.action === "enqueued" ? "Lote enfileirado!" : `Ação: ${r.action}`);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
   });
 
+  const { data: headerStats } = useQuery({
+    queryKey: ["pools-header-stats"],
+    queryFn: async () => {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const [todayRes, queueRes] = await Promise.all([
+        supabase
+          .from("scheduled_posts")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "published")
+          .gte("published_at", todayStart.toISOString()),
+        supabase
+          .from("scheduled_posts")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "scheduled"),
+      ]);
+      return {
+        publishedToday: todayRes.count ?? 0,
+        queueCount: queueRes.count ?? 0,
+      };
+    },
+    refetchInterval: 30_000,
+  });
+
+  const [confirmRunId, setConfirmRunId] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleRunNowClick = (poolId: string) => {
+    if (confirmRunId === poolId) {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+      setConfirmRunId(null);
+      runNow.mutate(poolId);
+    } else {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+      setConfirmRunId(poolId);
+      confirmTimeoutRef.current = setTimeout(() => {
+        setConfirmRunId(null);
+      }, 3500);
+    }
+  };
+
+  const activePools = filtered.filter(
+    (p) => p.status === "active" && !accountsMap[p.ig_account_id]?.is_restricted
+  );
+  const inactivePools = filtered.filter(
+    (p) => p.status !== "active" || !!accountsMap[p.ig_account_id]?.is_restricted
+  );
+
+  const activeAccountsCount = accounts.filter((a) => !a.is_restricted).length;
+  const suspendedAccountsCount = accounts.filter((a) => !!a.is_restricted).length;
+  const totalPublishedReels = pools.reduce((sum, p) => sum + (p.reels_published || 0), 0);
+  const totalLimitReels = pools.reduce((sum, p) => sum + (p.reel_limit || 30), 0);
+
+  const renderPoolCard = (p: Pool) => {
+    const acc = accountsMap[p.ig_account_id];
+    const counts = videoCounts[p.id] ?? { total: 0, pending: 0 };
+    const expanded = expandedPool === p.id;
+    const isSuspended = !!acc?.is_restricted;
+    const isLimitReached = Math.max(p.reels_reserved ?? 0, p.reels_published) >= (p.reel_limit ?? 30);
+    const isConfirming = confirmRunId === p.id;
+
+    return (
+      <div key={p.id} className="card-elevated overflow-hidden border border-neutral-200/90 rounded-2xl bg-white shadow-xs">
+        <div className="flex flex-wrap items-start justify-between gap-3 p-4.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-display text-lg font-bold text-neutral-900 truncate">{p.name}</h3>
+
+              {/* Badges de Status com Cores Harmoniosas */}
+              {isSuspended ? (
+                <span className="rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[10.5px] font-bold text-rose-700">
+                  🚨 Suspensa
+                </span>
+              ) : p.status === "active" ? (
+                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-semibold text-emerald-700">
+                  ● Ativo
+                </span>
+              ) : isLimitReached ? (
+                <span className="rounded-full border border-neutral-300 bg-neutral-100 px-2.5 py-0.5 text-[10.5px] font-semibold text-neutral-700">
+                  🏁 Concluído
+                </span>
+              ) : (
+                <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[10.5px] font-semibold text-amber-700">
+                  ⏸️ Pausado
+                </span>
+              )}
+
+              {isSuspended && (
+                <span className="rounded-full border border-rose-200 bg-rose-100 px-2 py-0.5 text-[9.5px] font-bold text-rose-800 uppercase tracking-wider">
+                  Circuit Breaker
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500 font-medium">
+              <span className={isSuspended ? "text-rose-600 font-bold" : "text-neutral-800 font-semibold"}>
+                @{acc?.username ?? "?"}
+              </span>
+              <span>Lote: {p.batch_size} reels{p.first_batch_size != null && p.batches_published === 0 ? ` · Primeiro: ${p.first_batch_size}` : ""}</span>
+              <span>Intervalo: {p.interval_minutes} min</span>
+              <span>Fila: {counts.pending}/{counts.total} restantes no ciclo #{p.cycle_number}</span>
+              <span>Total do pool: {Math.max(p.reels_reserved ?? 0, p.reels_published)}/{p.reel_limit ?? 30} reels · {p.batches_published} lotes</span>
+            </div>
+
+            <div className="mt-1 text-xs text-neutral-500">
+              {p.status === "active" && p.next_batch_at && !isSuspended ? (
+                <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                  <Clock className="h-3 w-3" /> Próximo lote {formatDistanceToNow(new Date(p.next_batch_at), { locale: ptBR, addSuffix: true })} ({format(new Date(p.next_batch_at), "dd/MM HH:mm")})
+                </span>
+              ) : isSuspended ? (
+                <span className="text-rose-600 font-medium">Pool travado — conta com restrição na Meta</span>
+              ) : (
+                <span>Pausado — retome para agendar o próximo lote</span>
+              )}
+            </div>
+
+            {/* Alerta Destacado se Conta Suspensa */}
+            {isSuspended && (
+              <div className="mt-2.5 rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 text-xs text-rose-800 flex items-start gap-2">
+                <span className="text-base leading-none shrink-0">🚨</span>
+                <div>
+                  <p className="font-semibold">Conta restrita ou suspensa pela Meta</p>
+                  <p className="text-[11px] text-rose-700 mt-0.5">
+                    Para blindar seu Meta App ID, os disparos automáticos e manuais deste pool foram bloqueados pelo Circuit Breaker.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Botão Rodar Agora com Proteção de Missclick */}
+            <button
+              onClick={() => handleRunNowClick(p.id)}
+              disabled={isSuspended || runNow.isPending || counts.total === 0}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed ${
+                isConfirming
+                  ? "bg-amber-50 border border-amber-400 text-amber-900 hover:bg-amber-100 animate-pulse"
+                  : "border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+              }`}
+              title={
+                isSuspended
+                  ? "Conta suspensa pela Meta — disparo bloqueado"
+                  : isConfirming
+                  ? "Clique novamente para confirmar envio"
+                  : "Enfileirar próximo lote agora"
+              }
+            >
+              <Send className={`h-3.5 w-3.5 ${isConfirming ? "text-amber-600" : "text-neutral-600"}`} />
+              {isConfirming ? "Confirmar envio de lote?" : "Rodar agora"}
+            </button>
+
+            <button
+              onClick={() => toggleStatus.mutate(p)}
+              disabled={isSuspended && p.status === "paused"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+              title={isSuspended ? "Conta suspensa pela Meta" : p.status === "active" ? "Pausar pool" : "Retomar pool"}
+            >
+              {p.status === "active" ? <><Pause className="h-3.5 w-3.5" /> Pausar</> : <><Play className="h-3.5 w-3.5" /> Retomar</>}
+            </button>
+            <button
+              onClick={() => { if (confirm(`Excluir "${p.name}"? Os posts já agendados continuam na fila.`)) del.mutate(p.id); }}
+              className="rounded-xl border border-neutral-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50 shadow-xs"
+              title="Excluir pool"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setExpandedPool(expanded ? null : p.id)}
+              className="rounded-xl border border-neutral-200 bg-white p-1.5 text-neutral-600 hover:bg-neutral-50 shadow-xs"
+              title="Detalhes do pool"
+            >
+              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+        {p.caption && (
+          <div className="border-t border-neutral-100 bg-neutral-50/60 px-4 py-2 text-xs text-neutral-600 line-clamp-2">
+            <span className="font-semibold text-neutral-800">Legenda:</span> {p.caption}
+          </div>
+        )}
+        {expanded && <PoolDetail pool={p} accounts={accounts} />}
+      </div>
+    );
+  };
+
   return (
     <div>
       <PageHeader
         title="Pools de Rotação"
-        description={`${pools.length} pools · ${pools.filter((p) => p.status === "active").length} ativos · publica Reels em lotes com rotação circular`}
-        actions={
+        description="Gestão de publicação contínua em lotes e rotação circular de Reels"
+      />
+      <PageBody>
+        {/* CONTADORES GLASS MODERNOS (ESTILO RELÓGIO DE PAREDE / DISPLAY DIGITAL) */}
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Card 1: Reels Postados */}
+          <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/95 p-4.5 text-white shadow-xl backdrop-blur-md transition-all hover:border-neutral-700 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-400">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                <Film className="h-3.5 w-3.5 text-[#E5B842]" /> Reels Postados
+              </span>
+              <span className="rounded-full bg-neutral-800/80 px-2 py-0.5 text-[10px] font-medium text-neutral-300">
+                Hoje
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-white">
+                {headerStats?.publishedToday ?? 0}
+              </span>
+              <span className="text-xs font-medium text-neutral-400">reels publicados</span>
+            </div>
+            <div className="mt-2 text-[11px] text-neutral-500 font-medium">
+              Ciclo dos pools: {totalPublishedReels}/{totalLimitReels} reels
+            </div>
+          </div>
+
+          {/* Card 2: Contas Ativas (Verde) */}
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-neutral-900/95 p-4.5 text-white shadow-xl backdrop-blur-md transition-all hover:border-emerald-500/50 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs font-semibold text-emerald-400">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> Contas Ativas
+              </span>
+              <span className="rounded-full bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                Online
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-emerald-400">
+                {activeAccountsCount}
+              </span>
+              <span className="text-xs font-medium text-neutral-400">contas conectadas</span>
+            </div>
+            <div className="mt-2 text-[11px] text-emerald-300/80 font-medium">
+              {pools.filter((p) => p.status === "active").length} pools operando normalmente
+            </div>
+          </div>
+
+          {/* Card 3: Contas Caídas / Suspensas (Vermelho) */}
+          <div className={`relative overflow-hidden rounded-2xl border p-4.5 text-white shadow-xl backdrop-blur-md transition-all flex flex-col justify-between ${
+            suspendedAccountsCount > 0
+              ? "border-rose-500/50 bg-neutral-900/95"
+              : "border-neutral-800 bg-neutral-900/95"
+          }`}>
+            <div className="flex items-center justify-between text-xs font-semibold text-rose-400">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-400" /> Contas Suspensas
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                suspendedAccountsCount > 0
+                  ? "bg-rose-950/60 border border-rose-500/40 text-rose-300"
+                  : "bg-neutral-800 text-neutral-400"
+              }`}>
+                {suspendedAccountsCount > 0 ? "Alerta Meta" : "Estável"}
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className={`font-mono text-3xl font-extrabold tracking-tight ${
+                suspendedAccountsCount > 0 ? "text-rose-400" : "text-neutral-400"
+              }`}>
+                {suspendedAccountsCount}
+              </span>
+              <span className="text-xs font-medium text-neutral-400">contas restritas</span>
+            </div>
+            <div className="mt-2 text-[11px] text-neutral-500 font-medium">
+              {suspendedAccountsCount > 0
+                ? "Circuit Breaker ativado para blindagem"
+                : "Zero bloqueios ou restrições"}
+            </div>
+          </div>
+
+          {/* Card 4: Atalho para a Fila */}
+          <Link
+            to="/queue"
+            className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/95 p-4.5 text-white shadow-xl backdrop-blur-md transition-all hover:border-[#E5B842]/50 hover:bg-neutral-900 flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-400 group-hover:text-[#E5B842] transition-colors">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                <Clock className="h-3.5 w-3.5 text-[#E5B842]" /> Fila de Postagem
+              </span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-neutral-500 group-hover:text-[#E5B842] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-[#E5B842]">
+                {headerStats?.queueCount ?? 0}
+              </span>
+              <span className="text-xs font-medium text-neutral-400">reels na fila</span>
+            </div>
+            <div className="mt-2 text-[11px] text-neutral-400 font-medium group-hover:text-neutral-200 transition-colors">
+              Ver agendamentos em tempo real →
+            </div>
+          </Link>
+        </div>
+
+        {/* Barra de Filtros & Ações (com botão Novo Pool descido para abrir espaço no topo) */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-neutral-200 shadow-xs">
+          {/* Filtro por conta */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setAccountFilter("all")}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                accountFilter === "all"
+                  ? "bg-[#09090B] text-white shadow-xs"
+                  : "border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+              }`}
+            >
+              Todas as contas <span className="rounded-full bg-neutral-200/80 px-1.5 py-0.5 text-[10px] text-neutral-800">{pools.length}</span>
+            </button>
+            {accounts.map((a) => {
+              const count = pools.filter((p) => p.ig_account_id === a.id).length;
+              if (count === 0) return null;
+              const active = accountFilter === a.id;
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setAccountFilter(a.id)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                    active
+                      ? "bg-[#09090B] text-white shadow-xs"
+                      : "border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                  }`}
+                >
+                  @{a.username} <span className="rounded-full bg-neutral-200/80 px-1.5 py-0.5 text-[10px] text-neutral-800">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Botão Novo Pool Descendo para abrir espaço no topo */}
           <GradientButton onClick={() => setShowCreate(true)}>
             <Plus className="h-4 w-4" /> Novo pool
           </GradientButton>
-        }
-      />
-      <PageBody>
-        {/* Filtro por conta */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button
-            onClick={() => setAccountFilter("all")}
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition ${accountFilter === "all" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
-          >
-            Todas as contas <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{pools.length}</span>
-          </button>
-          {accounts.map((a) => {
-            const count = pools.filter((p) => p.ig_account_id === a.id).length;
-            if (count === 0) return null;
-            const active = accountFilter === a.id;
-            return (
-              <button
-                key={a.id}
-                onClick={() => setAccountFilter(a.id)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition ${active ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
-              >
-                @{a.username} <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{count}</span>
-              </button>
-            );
-          })}
         </div>
 
         {isLoading ? (
@@ -189,79 +491,52 @@ function PoolsPage() {
             action={<GradientButton onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Criar primeiro pool</GradientButton>}
           />
         ) : (
-          <div className="space-y-3">
-            {filtered.map((p) => {
-              const acc = accountsMap[p.ig_account_id];
-              const counts = videoCounts[p.id] ?? { total: 0, pending: 0 };
-              const expanded = expandedPool === p.id;
-              return (
-                <div key={p.id} className="card-elevated overflow-hidden">
-                  <div className="flex flex-wrap items-start justify-between gap-3 p-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-display text-lg font-semibold truncate">{p.name}</h3>
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${p.status === "active" ? "bg-success/15 text-success border-success/30" : "bg-muted text-muted-foreground border-border"}`}>
-                          {p.status === "active" ? "Ativo" : "Pausado"}
-                        </span>
-                        {acc?.is_restricted && (
-                          <span className="rounded-full border border-destructive/40 bg-destructive/15 text-destructive px-2 py-0.5 text-[10px] font-semibold uppercase">
-                            Restricted
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span className={acc?.is_restricted ? "text-destructive font-medium" : ""}>@{acc?.username ?? "?"}</span>
-                        <span>Lote: {p.batch_size} reels{p.first_batch_size != null && p.batches_published === 0 ? ` · Primeiro: ${p.first_batch_size}` : ""}</span>
-                        <span>Intervalo: {p.interval_minutes} min</span>
-                        <span>Fila: {counts.pending}/{counts.total} restantes no ciclo #{p.cycle_number}</span>
-                        <span>Total do pool: {Math.max(p.reels_reserved ?? 0, p.reels_published)}/{p.reel_limit ?? 40} reels · {p.batches_published} lotes</span>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {p.status === "active" && p.next_batch_at ? (
-                          <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Próximo lote {formatDistanceToNow(new Date(p.next_batch_at), { locale: ptBR, addSuffix: true })} ({format(new Date(p.next_batch_at), "dd/MM HH:mm")})</span>
-                        ) : p.status === "paused" ? (
-                          <span>Pausado — retome para agendar o próximo lote</span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => runNow.mutate(p.id)}
-                        disabled={runNow.isPending || counts.total === 0}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-                        title="Enfileirar próximo lote agora"
-                      >
-                        <Send className="h-3.5 w-3.5" /> Rodar agora
-                      </button>
-                      <button
-                        onClick={() => toggleStatus.mutate(p)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted"
-                      >
-                        {p.status === "active" ? <><Pause className="h-3.5 w-3.5" /> Pausar</> : <><Play className="h-3.5 w-3.5" /> Retomar</>}
-                      </button>
-                      <button
-                        onClick={() => { if (confirm(`Excluir "${p.name}"? Os posts já agendados continuam na fila.`)) del.mutate(p.id); }}
-                        className="rounded-lg border border-border bg-card p-1.5 text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setExpandedPool(expanded ? null : p.id)}
-                        className="rounded-lg border border-border bg-card p-1.5 hover:bg-muted"
-                      >
-                        {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  {p.caption && (
-                    <div className="border-t border-border/60 bg-muted/30 px-4 py-2 text-xs text-muted-foreground line-clamp-2">
-                      <span className="font-medium">Legenda:</span> {p.caption}
-                    </div>
-                  )}
-                  {expanded && <PoolDetail pool={p} accounts={accounts} />}
+          <div className="space-y-6">
+            {/* SEÇÃO 1: POOLS ATIVOS EM ANDAMENTO */}
+            {activePools.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">
+                    Pools Ativos em Andamento ({activePools.length})
+                  </h4>
                 </div>
-              );
-            })}
+                <div className="space-y-3">
+                  {activePools.map(renderPoolCard)}
+                </div>
+              </div>
+            )}
+
+            {/* LINHA DIVISÓRIA SEPARADORA ("LINHA TIPO ATIVAS") */}
+            {activePools.length > 0 && inactivePools.length > 0 && (
+              <div className="relative py-3">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-neutral-300/80" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-4 text-xs font-bold uppercase tracking-wider text-neutral-500">
+                    Pools Pausados ou Concluídos ({inactivePools.length})
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* SEÇÃO 2: POOLS PAUSADOS OU CONCLUÍDOS */}
+            {inactivePools.length > 0 && (
+              <div className="space-y-3">
+                {activePools.length === 0 && (
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">
+                      Pools Pausados ou Concluídos ({inactivePools.length})
+                    </h4>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {inactivePools.map(renderPoolCard)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </PageBody>
@@ -731,19 +1006,31 @@ function CreatePoolDialog({ accounts, existingPools = [], onClose }: { accounts:
                 }}
                 className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm font-medium text-neutral-900 shadow-xs focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
               >
-                {accounts.map((a) => {
-                  const isUsed = usedAccountIds.has(a.id);
-                  return (
-                    <option
-                      key={a.id}
-                      value={a.id}
-                      disabled={isUsed}
-                      className={isUsed ? "text-neutral-400 bg-neutral-50" : "text-neutral-900"}
-                    >
-                      @{a.username} {isUsed ? "(Já possui pool ativo)" : ""}
-                    </option>
-                  );
-                })}
+                <optgroup label="─── Contas Disponíveis (Sem pool) ───">
+                  {accounts
+                    .filter((a) => !usedAccountIds.has(a.id) && !a.is_restricted)
+                    .map((a) => (
+                      <option key={a.id} value={a.id} className="text-neutral-900">
+                        @{a.username} (Livre)
+                      </option>
+                    ))}
+                </optgroup>
+                {accounts.some((a) => usedAccountIds.has(a.id) || a.is_restricted) && (
+                  <optgroup label="─── Contas Ocupadas ou Restritas ───">
+                    {accounts
+                      .filter((a) => usedAccountIds.has(a.id) || a.is_restricted)
+                      .map((a) => (
+                        <option
+                          key={a.id}
+                          value={a.id}
+                          disabled
+                          className="text-neutral-400 bg-neutral-50"
+                        >
+                          @{a.username} {a.is_restricted ? "(Conta suspensa)" : "(Já possui pool ativo)"}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
               </select>
               {availableAccounts.length === 0 ? (
                 <p className="mt-1 text-xs font-semibold text-amber-600">
