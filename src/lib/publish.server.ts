@@ -210,15 +210,70 @@ import type { ConnectionOptions } from "tls";
 let cachedProxyAgent: ProxyAgent | null = null;
 let lastProxyUrl: string | null = null;
 
-const BROWSER_MIMIC_HEADERS: Record<string, string> = {
-  "user-agent": "Mozilla/5.0 (Linux; Android 14; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36",
-  "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="124", "Google Chrome";v="124"',
-  "sec-ch-ua-mobile": "?1",
-  "sec-ch-ua-platform": '"Android"',
-  "accept": "application/json, text/plain, */*",
-  "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-  "accept-encoding": "gzip, deflate, br",
-};
+interface DeviceProfile {
+  ua: string;
+  chUa: string;
+  platform: string;
+  mobile: string;
+}
+
+const DEVICE_PROFILES: DeviceProfile[] = [
+  {
+    ua: "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36",
+    chUa: '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+    platform: '"Android"',
+    mobile: "?1",
+  },
+  {
+    ua: "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.112 Mobile Safari/537.36",
+    chUa: '"Not_A Brand";v="8", "Chromium";v="125", "Google Chrome";v="125"',
+    platform: '"Android"',
+    mobile: "?1",
+  },
+  {
+    ua: "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.182 Mobile Safari/537.36",
+    chUa: '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+    platform: '"Android"',
+    mobile: "?1",
+  },
+  {
+    ua: "Mozilla/5.0 (Linux; Android 14; 23116PN5BC) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.141 Mobile Safari/537.36",
+    chUa: '"Not_A Brand";v="8", "Chromium";v="125", "Google Chrome";v="125"',
+    platform: '"Android"',
+    mobile: "?1",
+  },
+  {
+    ua: "Mozilla/5.0 (Linux; Android 14; motorola edge 40 pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.113 Mobile Safari/537.36",
+    chUa: '"Not_A Brand";v="8", "Chromium";v="124", "Google Chrome";v="124"',
+    platform: '"Android"',
+    mobile: "?1",
+  },
+  {
+    ua: "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36",
+    chUa: '"Not_A Brand";v="8", "Chromium";v="124", "Google Chrome";v="124"',
+    platform: '"Android"',
+    mobile: "?1",
+  }
+];
+
+function getDeviceHeaders(seed: string = ""): Record<string, string> {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % DEVICE_PROFILES.length;
+  const dev = DEVICE_PROFILES[idx];
+  return {
+    "user-agent": dev.ua,
+    "sec-ch-ua": dev.chUa,
+    "sec-ch-ua-mobile": dev.mobile,
+    "sec-ch-ua-platform": dev.platform,
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "accept-encoding": "gzip, deflate, br",
+  };
+}
 
 function normalizeProxyUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -276,7 +331,7 @@ async function graph<T = any>(
   const bodyContent = method === "POST" ? form.toString() : undefined;
   try {
     const headers: Record<string, string> = {
-      ...BROWSER_MIMIC_HEADERS,
+      ...getDeviceHeaders(token),
       ...(method === "POST" ? { "content-type": "application/x-www-form-urlencoded" } : {}),
     };
     const fetchImpl = dispatcher ? (undiciFetch as any) : fetch;
