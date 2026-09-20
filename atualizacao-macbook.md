@@ -1,3 +1,4 @@
+
 # 📋 RELATÓRIO COMPLETO DE ATUALIZAÇÃO - MACBOOK (ALPHA ELITE)
 
 Este documento registra **absolutamente tudo** o que foi planejado, desenvolvido, refatorado, corrigido e integrado no projeto durante as sessões de trabalho no MacBook.
@@ -230,6 +231,8 @@ Durante o processo, foram sincronizadas e integradas as correções críticas de
    - Ajustada a regra de alerta de visualizações zeradas para checar especificamente `(p.like_count ?? 0) === 0`.
 4. **`README.md`**:
    - Criado e sincronizado o manual operacional master completo com arquitetura, banco, crons e guia de incidentes.
+5. **`DOCS_SUBIR_NOVO_PAINEL.md` (Puxado do Repositório Remoto)**:
+   - Manual completo de isolamento de infraestrutura (Zero-Footprint), ensinando como criar novos Cloudflare Workers dedicados para mídia, alocação de proxies residenciais individuais por painel e configuração de cronjobs independentes na VPS.
 
 ---
 
@@ -250,6 +253,9 @@ O histórico local do branch `main` foi mantido perfeitamente rastreável com co
 | `f66c476` | `feat(ui): integrated frontend redesign, operational manual, and backend cron/metrics fixes` | Integração do redesign, fix do import cron em `publish-scheduled.ts`, proxies em `metrics.server.ts` e `README.md`. |
 | `8e8c83f` | `feat(pools): glass counters display, gold sidebar navigation, missclick protection, and account circuit breaker` | Implementação do Circuit Breaker, confirmação de missclick, sidebar dourada, agrupamento de postagem e separação de pools. |
 | `4ceac8c` | `style(pools): minimalist translucent glass counters without black background` | Refinamento dos 4 cards de contadores no topo de `/pools` para vidro translúcido sem blocos pretos. |
+| `bc6394e` | `docs: create complete atualizacao-macbook report detailing all changes` | Criação do documento completo de auditoria e relatório técnico de todas as alterações feitas no Mac. |
+| `2fdc52a` | *(origin/main)* `docs: add guide for deploying isolated panels with dedicated proxies and cloudflare workers` | Commit remoto recebido contendo o guia `DOCS_SUBIR_NOVO_PAINEL.md`. |
+
 
 ---
 
