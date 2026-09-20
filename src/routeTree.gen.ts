@@ -29,6 +29,7 @@ import { Route as AuthenticatedCloneAccountRouteImport } from './routes/_authent
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as ApiPublicDebugProxyRouteImport } from './routes/api/public/debug-proxy'
 import { Route as ApiPublicInstagramCallbackRouteImport } from './routes/api/public/instagram/callback'
 import { Route as ApiPublicCronReapStuckRouteImport } from './routes/api/public/cron/reap-stuck'
 import { Route as ApiPublicCronPublishScheduledRouteImport } from './routes/api/public/cron/publish-scheduled'
@@ -137,6 +138,11 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicDebugProxyRoute = ApiPublicDebugProxyRouteImport.update({
+  id: '/api/public/debug-proxy',
+  path: '/api/public/debug-proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicInstagramCallbackRoute =
   ApiPublicInstagramCallbackRouteImport.update({
     id: '/api/public/instagram/callback',
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/setup-guide': typeof AuthenticatedSetupGuideRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/public/debug-proxy': typeof ApiPublicDebugProxyRoute
   '/api/public/cron/monitor-posts': typeof ApiPublicCronMonitorPostsRoute
   '/api/public/cron/process-pools': typeof ApiPublicCronProcessPoolsRoute
   '/api/public/cron/publish-scheduled': typeof ApiPublicCronPublishScheduledRoute
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/setup-guide': typeof AuthenticatedSetupGuideRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/public/debug-proxy': typeof ApiPublicDebugProxyRoute
   '/api/public/cron/monitor-posts': typeof ApiPublicCronMonitorPostsRoute
   '/api/public/cron/process-pools': typeof ApiPublicCronProcessPoolsRoute
   '/api/public/cron/publish-scheduled': typeof ApiPublicCronPublishScheduledRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/setup-guide': typeof AuthenticatedSetupGuideRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/public/debug-proxy': typeof ApiPublicDebugProxyRoute
   '/api/public/cron/monitor-posts': typeof ApiPublicCronMonitorPostsRoute
   '/api/public/cron/process-pools': typeof ApiPublicCronProcessPoolsRoute
   '/api/public/cron/publish-scheduled': typeof ApiPublicCronPublishScheduledRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup-guide'
     | '/api/tts'
+    | '/api/public/debug-proxy'
     | '/api/public/cron/monitor-posts'
     | '/api/public/cron/process-pools'
     | '/api/public/cron/publish-scheduled'
@@ -295,6 +305,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup-guide'
     | '/api/tts'
+    | '/api/public/debug-proxy'
     | '/api/public/cron/monitor-posts'
     | '/api/public/cron/process-pools'
     | '/api/public/cron/publish-scheduled'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/setup-guide'
     | '/api/tts'
+    | '/api/public/debug-proxy'
     | '/api/public/cron/monitor-posts'
     | '/api/public/cron/process-pools'
     | '/api/public/cron/publish-scheduled'
@@ -334,6 +346,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiPublicDebugProxyRoute: typeof ApiPublicDebugProxyRoute
   ApiPublicCronMonitorPostsRoute: typeof ApiPublicCronMonitorPostsRoute
   ApiPublicCronProcessPoolsRoute: typeof ApiPublicCronProcessPoolsRoute
   ApiPublicCronPublishScheduledRoute: typeof ApiPublicCronPublishScheduledRoute
@@ -483,6 +496,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/debug-proxy': {
+      id: '/api/public/debug-proxy'
+      path: '/api/public/debug-proxy'
+      fullPath: '/api/public/debug-proxy'
+      preLoaderRoute: typeof ApiPublicDebugProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/instagram/callback': {
       id: '/api/public/instagram/callback'
       path: '/api/public/instagram/callback'
@@ -567,6 +587,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiTtsRoute: ApiTtsRoute,
+  ApiPublicDebugProxyRoute: ApiPublicDebugProxyRoute,
   ApiPublicCronMonitorPostsRoute: ApiPublicCronMonitorPostsRoute,
   ApiPublicCronProcessPoolsRoute: ApiPublicCronProcessPoolsRoute,
   ApiPublicCronPublishScheduledRoute: ApiPublicCronPublishScheduledRoute,

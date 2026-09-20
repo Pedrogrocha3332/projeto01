@@ -36,11 +36,12 @@ export function LiveClock({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-xs">
-      <span className="text-muted-foreground capitalize">{date}</span>
-      <span className="h-3 w-px bg-border" />
-      <span className="font-mono tabular-nums font-semibold gold-text text-sm">{time}</span>
-      <span className="text-[10px] text-muted-foreground">SP</span>
+    <div className="flex items-center justify-between rounded-xl border border-neutral-800 bg-[#141417] px-3.5 py-2.5 text-xs shadow-xs">
+      <span className="text-[#A1A1AA] capitalize font-medium">{date}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="font-mono tabular-nums font-bold text-[#FACC15] text-sm tracking-tight">{time}</span>
+        <span className="text-[10px] text-[#71717A] font-semibold">SP</span>
+      </div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ export const Route = createFileRoute("/api/public/cron/publish-scheduled")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { processScheduledPostTick, markPostFailed } = await import("@/lib/publish.server");
+        const { tickPublicationRounds } = await import("@/lib/rounds.server");
 
         let rounds: Awaited<ReturnType<typeof tickPublicationRounds>>;
         try { rounds = await tickPublicationRounds(); } catch (e) {

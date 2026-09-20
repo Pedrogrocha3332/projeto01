@@ -19,13 +19,24 @@ const BROWSER_MIMIC_HEADERS: Record<string, string> = {
   "accept-encoding": "gzip, deflate, br",
 };
 
+function normalizeProxyUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const parts = trimmed.split(":");
+  if (parts.length === 4) {
+    const [host, port, user, pass] = parts;
+    return `http://${user}:${pass}@${host}:${port}`;
+  }
+  return `http://${trimmed}`;
+}
+
 function getProxyDispatcher(): ProxyAgent | undefined {
-  const proxyUrl = process.env.PROXY_URL?.trim();
-  if (!proxyUrl) return undefined;
+  const raw = process.env.PROXY_URL?.trim();
+  if (!raw) return undefined;
+  const proxyUrl = normalizeProxyUrl(raw);
   if (cachedProxyAgent && lastProxyUrl === proxyUrl) return cachedProxyAgent;
   try {
     const tlsOptions: ConnectionOptions = {
-      ALPNProtocols: ["h2", "http/1.1"],
       servername: "graph.instagram.com",
     };
     cachedProxyAgent = new ProxyAgent({

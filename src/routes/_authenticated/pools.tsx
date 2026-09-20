@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageBody, EmptyState, GradientButton } from "@/components/app/page";
-import { Repeat, Plus, Play, Pause, Trash2, Film, Send, X, Clock, ChevronDown, ChevronUp, Search, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Repeat, Plus, Play, Pause, Trash2, Film, Send, X, Clock, ChevronDown, ChevronUp, Search, ExternalLink, CheckCircle2, AlertCircle, Loader2, MessageSquare, Lock } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -266,7 +266,7 @@ function PoolsPage() {
         )}
       </PageBody>
 
-      {showCreate && <CreatePoolDialog accounts={accounts} onClose={() => setShowCreate(false)} />}
+      {showCreate && <CreatePoolDialog accounts={accounts} existingPools={pools} onClose={() => setShowCreate(false)} />}
     </div>
   );
 }
@@ -499,7 +499,7 @@ function PoolConfig({ pool }: { pool: Pool }) {
   );
 }
 
-function CoverPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+function CoverPicker({ value, onChange, required = false }: { value: string | null; onChange: (id: string | null) => void; required?: boolean }) {
   const [search, setSearch] = useState("");
   const { data: images = [] } = useQuery({
     queryKey: ["media-images-selectable"],
@@ -517,7 +517,19 @@ function CoverPicker({ value, onChange }: { value: string | null; onChange: (id:
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-medium">Capa fixa dos Reels (imagem única aplicada em todos os vídeos)</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-neutral-800">Capa fixa dos Reels</span>
+          {required && <span className="text-xs font-bold text-red-500">* (Obrigatória)</span>}
+          {value ? (
+            <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
+              ✓ Capa selecionada
+            </span>
+          ) : required ? (
+            <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10.5px] font-medium text-amber-700">
+              Escolha uma capa abaixo
+            </span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           {value && (
             <button type="button" onClick={() => onChange(null)} className="rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted">
@@ -531,9 +543,15 @@ function CoverPicker({ value, onChange }: { value: string | null; onChange: (id:
         </div>
       </div>
       {selected && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 p-2">
-          <AssetImage storagePath={selected.storage_path} publicUrl={selected.public_url} alt={selected.file_name} className="h-12 w-12 rounded object-cover" />
-          <span className="text-xs text-muted-foreground truncate flex-1">Capa: {selected.file_name}</span>
+        <div className="mb-2 flex items-center gap-3 rounded-xl border border-emerald-300/80 bg-emerald-50/40 p-2.5">
+          <AssetImage storagePath={selected.storage_path} publicUrl={selected.public_url} alt={selected.file_name} className="h-12 w-12 rounded-lg object-cover shadow-xs border border-emerald-200" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-neutral-900 truncate block">Capa: {selected.file_name}</span>
+            <span className="text-[11px] text-emerald-700">Esta imagem será a capa fixa de todos os vídeos deste pool.</span>
+          </div>
+          <button type="button" onClick={() => onChange(null)} className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 transition-colors">
+            Trocar
+          </button>
         </div>
       )}
       {images.length === 0 ? (
@@ -556,21 +574,48 @@ function CoverPicker({ value, onChange }: { value: string | null; onChange: (id:
   );
 }
 
-function CreatePoolDialog({ accounts, onClose }: { accounts: Account[]; onClose: () => void }) {
+function CreatePoolDialog({ accounts, existingPools = [], onClose }: { accounts: Account[]; existingPools?: Pool[]; onClose: () => void }) {
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+
+  // Contas com pool existente
+  const usedAccountIds = useMemo(() => new Set(existingPools.map((p) => p.ig_account_id)), [existingPools]);
+  const availableAccounts = useMemo(() => accounts.filter((a) => !usedAccountIds.has(a.id)), [accounts, usedAccountIds]);
+
+  // Próximo número sequencial para o nome do pool
+  const nextPoolNumber = useMemo(() => {
+    const numbers = existingPools
+      .map((p) => {
+        const match = p.name.match(/\d+/);
+        return match ? parseInt(match[0], 10) : null;
+      })
+      .filter((n): n is number => n !== null && !isNaN(n));
+    return numbers.length > 0 ? Math.max(...numbers) + 1 : existingPools.length + 1;
+  }, [existingPools]);
+
+  const defaultName = `Pool ${nextPoolNumber}`;
+  const [name] = useState(defaultName);
+
+  // Seleciona a primeira conta disponível que ainda não tem pool
+  const [accountId, setAccountId] = useState(() => availableAccounts[0]?.id ?? accounts[0]?.id ?? "");
+
   const [videoSource, setVideoSource] = useState("all");
   const [firstComment, setFirstComment] = useState("");
+  const [showCommentToggle, setShowCommentToggle] = useState(false);
+  const [showAdvancedTiming, setShowAdvancedTiming] = useState(false);
+  const [showOrderEditor, setShowOrderEditor] = useState(false);
+
   const [caption, setCaption] = useState("");
   const [caption2, setCaption2] = useState("");
   const [caption3, setCaption3] = useState("");
   const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
-  const [batch, setBatch] = useState(3);
+
+  // Novos padrões: 30 reels de limite, 5 no primeiro lote, 5 nos lotes seguintes, 60m intervalo, 60s espaço
+  const [batch, setBatch] = useState(5);
   const [interval, setInterval] = useState(60);
   const [spacing, setSpacing] = useState(60);
-  const [reelLimit, setReelLimit] = useState(40);
-  const [firstBatch, setFirstBatch] = useState<number | "">(6);
+  const [reelLimit, setReelLimit] = useState(30);
+  const [firstBatch, setFirstBatch] = useState<number | "">(5);
+
   const manualOrder = true;
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
   const [coverId, setCoverId] = useState<string | null>(null);
@@ -586,148 +631,492 @@ function CreatePoolDialog({ accounts, onClose }: { accounts: Account[]; onClose:
 
   const createFn = useServerFn(createPool);
   const create = useMutation({
-    mutationFn: async () => await createFn({ data: {
-      ig_account_id: accountId,
-      name,
-      first_comment: firstComment,
-      caption,
-      caption_2: caption2,
-      caption_3: caption3,
-      batch_size: batch,
-      reel_limit: reelLimit,
-      first_batch_size: firstBatch === "" ? null : firstBatch,
-      interval_minutes: interval,
-      spacing_seconds: spacing,
-      video_ids: selectedVideos,
-      manual_order: manualOrder,
-      cover_media_asset_id: coverId,
-    } }),
+    mutationFn: async () =>
+      await createFn({
+        data: {
+          ig_account_id: accountId,
+          name,
+          first_comment: firstComment.trim() || undefined,
+          caption,
+          caption_2: caption2,
+          caption_3: caption3,
+          batch_size: batch,
+          reel_limit: reelLimit,
+          first_batch_size: firstBatch === "" ? null : firstBatch,
+          interval_minutes: interval,
+          spacing_seconds: spacing,
+          video_ids: selectedVideos,
+          manual_order: manualOrder,
+          cover_media_asset_id: coverId,
+        },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["media-pools"] });
-      toast.success("Pool criado!");
+      toast.success("Pool criado com sucesso!");
       onClose();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar pool"),
   });
 
-  const canSubmit = name.trim() && accountId && selectedVideos.length > 0 && !create.isPending && !loadingVideos && !videoError;
+  const hasName = Boolean(name.trim());
+  const hasValidAccount = Boolean(accountId && !usedAccountIds.has(accountId));
+  const hasVideos = selectedVideos.length > 0;
+  const hasCaption = Boolean(caption.trim());
+  const hasCover = Boolean(coverId);
+
+  const canSubmit =
+    hasName &&
+    hasValidAccount &&
+    hasVideos &&
+    hasCaption &&
+    hasCover &&
+    !create.isPending &&
+    !loadingVideos &&
+    !videoError;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="relative flex max-h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <h2 className="font-display text-lg font-semibold">Novo Pool de Rotação</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex max-h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl"
+      >
+        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4 bg-white">
+          <div>
+            <h2 className="font-display text-lg font-bold text-neutral-900">Novo Pool de Rotação</h2>
+            <p className="text-xs text-neutral-500 mt-0.5">Configure a automação contínua de Reels para uma conta do Instagram.</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors">
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Top Grid: Nome Bloqueado & Conta Que Publica */}
+          <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="text-xs font-medium">Nome do pool</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Campanha Julho - Conta X" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-neutral-800">Nome do pool</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500">
+                  <Lock className="h-3 w-3" /> Gerado automaticamente
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={name}
+                  readOnly
+                  disabled
+                  tabIndex={-1}
+                  className="w-full cursor-not-allowed select-none rounded-xl border border-neutral-200 bg-neutral-100/90 px-3.5 py-2.5 text-sm font-semibold text-neutral-800 shadow-xs focus:outline-none"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-neutral-500">
+                Identificador sequencial travado pelo sistema para organização e rastreamento.
+              </p>
             </label>
+
             <label className="block">
-              <span className="text-xs font-medium">Conta que publica</span>
-              <select value={accountId} onChange={(e) => { setAccountId(e.target.value); setVideoSource("all"); setSelectedVideos([]); }} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
-                {accounts.map((a) => <option key={a.id} value={a.id}>@{a.username}</option>)}
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-neutral-800">Conta que publica</span>
+                <span className="text-[11px] font-medium text-neutral-500">
+                  {availableAccounts.length} {availableAccounts.length === 1 ? "disponível" : "disponíveis"}
+                </span>
+              </div>
+              <select
+                value={accountId}
+                onChange={(e) => {
+                  setAccountId(e.target.value);
+                  setVideoSource("all");
+                  setSelectedVideos([]);
+                }}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm font-medium text-neutral-900 shadow-xs focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+              >
+                {accounts.map((a) => {
+                  const isUsed = usedAccountIds.has(a.id);
+                  return (
+                    <option
+                      key={a.id}
+                      value={a.id}
+                      disabled={isUsed}
+                      className={isUsed ? "text-neutral-400 bg-neutral-50" : "text-neutral-900"}
+                    >
+                      @{a.username} {isUsed ? "(Já possui pool ativo)" : ""}
+                    </option>
+                  );
+                })}
               </select>
+              {availableAccounts.length === 0 ? (
+                <p className="mt-1 text-xs font-semibold text-amber-600">
+                  ⚠️ Todas as contas já possuem pool criado. Conecte uma nova conta ou pause/exclua um pool para liberar.
+                </p>
+              ) : usedAccountIds.has(accountId) ? (
+                <p className="mt-1 text-xs font-medium text-amber-600">
+                  Esta conta já possui um pool ativo. Escolha outra conta acima.
+                </p>
+              ) : null}
             </label>
           </div>
-<label className="block">
- <span className="text-xs font-medium">Limite total de reels</span>
- <input type="number" min={1} max={2147483647} value={reelLimit} onChange={e => setReelLimit(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
- <p className="text-xs text-muted-foreground">Inclui os já enfileirados. Não zera por dia. Reduzir não remove posts da fila.</p>
-</label>
-          <label className="block">
-            <span className="text-xs font-medium">Primeiro lote (reels, uma única vez)</span>
-            <input type="number" min={1} value={firstBatch} placeholder="Usar tamanho dos lotes seguintes" onChange={e => setFirstBatch(e.target.value === "" ? "" : Number(e.target.value))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <label className="block">
-              <span className="text-xs font-medium">Lotes seguintes (reels por vez)</span>
-              <input type="number" min={1} value={batch} onChange={(e) => setBatch(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium">Intervalo (minutos)</span>
-              <input type="number" min={5} value={interval} onChange={(e) => setInterval(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium">Espaço (segundos)</span>
-              <input type="number" min={0} max={1800} value={spacing} onChange={(e) => setSpacing(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-            </label>
+
+          {/* Toggle de Ritmo e Limites (fechado por padrão, substitui o card longo) */}
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-3">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedTiming((v) => !v)}
+              className="flex w-full items-center justify-between text-left text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-neutral-500" />
+                <span>Configurações de ritmo e limite</span>
+                <span className="rounded-full bg-neutral-200/80 px-2 py-0.5 text-[10.5px] font-medium text-neutral-700">
+                  {reelLimit} reels · 1º lote: {firstBatch || batch} · Lotes: {batch} · {interval}min
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-medium text-neutral-500">
+                <span>{showAdvancedTiming ? "Ocultar" : "Personalizar"}</span>
+                {showAdvancedTiming ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </div>
+            </button>
+
+            {showAdvancedTiming && (
+              <div className="mt-3.5 space-y-3 pt-3 border-t border-neutral-200/80">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-xs font-medium text-neutral-700">Limite total de reels</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={reelLimit}
+                      onChange={(e) => setReelLimit(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    />
+                    <p className="mt-1 text-[11px] text-neutral-500">Pool pausa automaticamente ao atingir este total.</p>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-neutral-700">Primeiro lote (reels, 1ª vez)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={firstBatch}
+                      placeholder="5"
+                      onChange={(e) => setFirstBatch(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    />
+                    <p className="mt-1 text-[11px] text-neutral-500">Quantidade de reels postados no primeiro disparo.</p>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="block">
+                    <span className="text-xs font-medium text-neutral-700">Lotes seguintes</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={batch}
+                      onChange={(e) => setBatch(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-neutral-700">Intervalo (minutos)</span>
+                    <input
+                      type="number"
+                      min={5}
+                      value={interval}
+                      onChange={(e) => setInterval(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-neutral-700">Espaço (segundos)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1800}
+                      value={spacing}
+                      onChange={(e) => setSpacing(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs">
-            <div className="flex items-center gap-2 font-semibold text-primary mb-1">
-              <Clock className="h-3.5 w-3.5" /> Ritmo de publicação
-            </div>
-            <p className="text-muted-foreground">
-              Limite total de {reelLimit} reels por pool, incluindo os já enfileirados. Ao atingir o limite, o pool pausa. O primeiro lote terá até <strong>{firstBatch === "" ? batch : firstBatch} Reels</strong>; os seguintes, até <strong>{batch} Reels</strong>, conforme os vídeos disponíveis. Após o último vídeo de cada lote, o sistema espera <strong>{interval} minutos</strong> para iniciar o próximo. Os posts do mesmo lote serão enfileirados com <strong>{spacing} segundos</strong> de espaçamento, com os vídeos <strong>{manualOrder ? "na ordem escolhida" : "embaralhados a cada ciclo"}</strong> e horários <strong>escalonados</strong> entre contas para não colidir com outros pools ativos.
-            </p>
-          </div>
-          <div className="block space-y-2">
+
+          {/* Legendas dos Reels (OBRIGATÓRIA) */}
+          <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium">Rodízio de Legendas (Gira a cada 6 Reels)</span>
-              <div className="flex gap-1 rounded bg-muted p-0.5 text-[11px] font-medium">
-                <button type="button" onClick={() => setActiveTab(1)} className={`rounded px-2 py-0.5 transition ${activeTab === 1 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Legenda 1</button>
-                <button type="button" onClick={() => setActiveTab(2)} className={`rounded px-2 py-0.5 transition ${activeTab === 2 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Legenda 2</button>
-                <button type="button" onClick={() => setActiveTab(3)} className={`rounded px-2 py-0.5 transition ${activeTab === 3 ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Legenda 3</button>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider">Legenda dos Reels</span>
+                <span className="text-xs font-bold text-red-500">* (Obrigatória)</span>
+                <span className="text-[11px] text-neutral-500">· Gira a cada {batch} Reels</span>
+              </div>
+              <div className="flex gap-1 rounded-lg bg-neutral-100 p-0.5 text-[11px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(1)}
+                  className={`rounded-md px-2.5 py-1 transition ${
+                    activeTab === 1 ? "bg-white text-neutral-900 shadow-xs font-semibold" : "text-neutral-600 hover:text-neutral-900"
+                  }`}
+                >
+                  Legenda 1 *
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(2)}
+                  className={`rounded-md px-2.5 py-1 transition ${
+                    activeTab === 2 ? "bg-white text-neutral-900 shadow-xs font-semibold" : "text-neutral-600 hover:text-neutral-900"
+                  }`}
+                >
+                  Legenda 2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(3)}
+                  className={`rounded-md px-2.5 py-1 transition ${
+                    activeTab === 3 ? "bg-white text-neutral-900 shadow-xs font-semibold" : "text-neutral-600 hover:text-neutral-900"
+                  }`}
+                >
+                  Legenda 3
+                </button>
               </div>
             </div>
-            <label className="block text-sm">Primeiro comentário (opcional)<textarea value={firstComment} onChange={e=>setFirstComment(e.target.value)} maxLength={2200} rows={3} placeholder="Comentário enviado após cada reel" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"/><span className="text-xs text-muted-foreground">Aplicado aos novos posts. A fila já criada permanece como está.</span></label>
-        {activeTab === 1 && (
-              <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={4} placeholder="Escreva a legenda 1 (usada nos posts 1-6, 19-24, etc...)" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" />
+
+            {activeTab === 1 && (
+              <div>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  rows={4}
+                  placeholder={`Escreva a legenda obrigatória dos Reels (usada nos posts 1-${batch}, ${batch * 3 + 1}-${batch * 4}, etc...)`}
+                  className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                />
+                {!caption.trim() && (
+                  <p className="mt-1 text-[11px] text-amber-600 font-medium">
+                    ⚠️ A Legenda 1 é obrigatória para a publicação dos reels.
+                  </p>
+                )}
+              </div>
             )}
             {activeTab === 2 && (
-              <textarea value={caption2} onChange={(e) => setCaption2(e.target.value)} rows={4} placeholder="Escreva a legenda 2 (usada nos posts 7-12, 25-30, etc... Deixe em branco se não quiser rodízio)" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" />
+              <textarea
+                value={caption2}
+                onChange={(e) => setCaption2(e.target.value)}
+                rows={4}
+                placeholder={`Escreva a legenda 2 (usada nos posts ${batch + 1}-${batch * 2}, etc... Deixe em branco se não quiser rodízio)`}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+              />
             )}
             {activeTab === 3 && (
-              <textarea value={caption3} onChange={(e) => setCaption3(e.target.value)} rows={4} placeholder="Escreva a legenda 3 (usada nos posts 13-18, 31-36, etc... Deixe em branco se não quiser rodízio)" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" />
+              <textarea
+                value={caption3}
+                onChange={(e) => setCaption3(e.target.value)}
+                rows={4}
+                placeholder={`Escreva a legenda 3 (usada nos posts ${batch * 2 + 1}-${batch * 3}, etc... Deixe em branco se não quiser rodízio)`}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+              />
             )}
+
+            {/* Toggle do Primeiro Comentário (Discreto e recolhido) */}
+            <div className="pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setShowCommentToggle((v) => !v)}
+                className="flex w-full items-center justify-between text-left text-xs font-semibold text-neutral-600 hover:text-neutral-900 py-1 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-neutral-400" />
+                  <span>Primeiro comentário automático (opcional)</span>
+                  {firstComment.trim() && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      ✓ Comentário ativo
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-medium text-neutral-500">
+                  <span>{showCommentToggle ? "Recolher" : "Adicionar"}</span>
+                  {showCommentToggle ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </div>
+              </button>
+
+              {showCommentToggle && (
+                <div className="mt-2.5 pt-2 border-t border-neutral-200/80">
+                  <textarea
+                    value={firstComment}
+                    onChange={(e) => setFirstComment(e.target.value)}
+                    maxLength={2200}
+                    rows={3}
+                    placeholder="Escreva o comentário enviado logo após cada reel ser publicado..."
+                    className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                  />
+                  <span className="mt-1 block text-[11px] text-neutral-500">
+                    Opcional. Postado automaticamente pela conta logo após o vídeo entrar no ar.
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <CoverPicker value={coverId} onChange={setCoverId} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={manualOrder} disabled /> Ordem dos vídeos obrigatória — selecione os vídeos e ajuste pelas setas
-          </label>
-          {manualOrder && <VideoOrderList items={selectedVideos.map(id => ({ id, label: videos.find(v => v.id === id)?.file_name ?? id }))}
-            onChange={setSelectedVideos} />}
+          {/* Capa Obrigatória */}
+          <div className="rounded-xl border border-neutral-200 bg-white p-4">
+            <CoverPicker value={coverId} onChange={setCoverId} required />
+          </div>
 
+          {/* Ordem dos vídeos (fechado por padrão para não poluir a tela) */}
+          {selectedVideos.length > 0 && (
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50/60 p-3">
+              <button
+                type="button"
+                onClick={() => setShowOrderEditor((v) => !v)}
+                className="flex w-full items-center justify-between text-left text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-neutral-500 font-bold">↕️</span>
+                  <span>Ajustar ordem manual dos vídeos (opcional)</span>
+                  <span className="rounded-full bg-neutral-200/80 px-2 py-0.5 text-[10.5px] font-medium text-neutral-600">
+                    {selectedVideos.length} vídeos ordenados
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-medium text-neutral-500">
+                  <span>{showOrderEditor ? "Ocultar" : "Personalizar ordem"}</span>
+                  {showOrderEditor ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </div>
+              </button>
 
+              {showOrderEditor && (
+                <div className="mt-3 pt-3 border-t border-neutral-200 space-y-2">
+                  <p className="text-[11px] text-neutral-500">
+                    Os vídeos serão publicados nesta ordem (do 1º ao último). Ajuste com as setas apenas se precisar alterar algum vídeo específico.
+                  </p>
+                  <VideoOrderList
+                    items={selectedVideos.map((id) => ({
+                      id,
+                      label: videos.find((v) => v.id === id)?.file_name ?? id,
+                    }))}
+                    onChange={setSelectedVideos}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Vídeos */}
           <div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-medium">Vídeos ({selectedVideos.length} selecionados no total · {filteredVideos.length} nesta aba)</span>
+              <span className="text-xs font-semibold text-neutral-800">
+                Vídeos ({selectedVideos.length} selecionados no total · {filteredVideos.length} nesta aba)
+              </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    const ids = filteredVideos.map((v) => v.id);
-                    const allSelected = ids.length > 0 && ids.every((id) => selectedVideos.includes(id));
-                    setSelectedVideos((prev) => allSelected ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids])));
+                    // Invertido: do último vídeo para o primeiro!
+                    const reversedIds = [...filteredVideos].reverse().map((v) => v.id);
+                    const allSelected = reversedIds.length > 0 && reversedIds.every((id) => selectedVideos.includes(id));
+                    setSelectedVideos((prev) => {
+                      if (allSelected) {
+                        return prev.filter((id) => !reversedIds.includes(id));
+                      } else {
+                        const newIds = reversedIds.filter((id) => !prev.includes(id));
+                        return [...prev, ...newIds];
+                      }
+                    });
                   }}
-                  className="rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted"
+                  className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors shadow-xs"
                 >
-                  {filteredVideos.length > 0 && filteredVideos.every((v) => selectedVideos.includes(v.id)) ? "Desmarcar todos" : "Selecionar todos"}
+                  {filteredVideos.length > 0 && filteredVideos.every((v) => selectedVideos.includes(v.id))
+                    ? "Desmarcar todos"
+                    : "Selecionar todos (do último ao 1º)"}
                 </button>
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="rounded border border-input bg-background pl-7 pr-2 py-1 text-xs" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar vídeos..."
+                    className="rounded-lg border border-neutral-300 bg-white pl-8 pr-3 py-1.5 text-xs text-neutral-900 shadow-xs focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                  />
                 </div>
               </div>
             </div>
-            <p className="mb-2 text-sm">Publicação: @{accounts.find(a => a.id === accountId)?.username ?? "conta deste pool"}</p>
+            <p className="mb-2 text-xs text-neutral-500 font-medium">
+              Publicação na conta: <strong className="text-neutral-800">@{accounts.find((a) => a.id === accountId)?.username ?? "conta selecionada"}</strong>
+            </p>
             <VideoSourceTabs accounts={accounts} value={videoSource} onChange={setVideoSource} />
-            {videoError ? <p role="alert" className="text-sm text-destructive">Não foi possível carregar os vídeos da biblioteca. Confira a conexão e a atualização SQL.</p> : loadingVideos ? <p>Carregando vídeos…</p> : filteredVideos.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">Nenhum vídeo nesta aba ou busca. Escolha outra conta ou Todas.</p>
+            {videoError ? (
+              <p role="alert" className="text-sm text-destructive mt-2">
+                Não foi possível carregar os vídeos da biblioteca. Confira a conexão e a atualização SQL.
+              </p>
+            ) : loadingVideos ? (
+              <p className="text-xs text-neutral-500 py-4">Carregando vídeos…</p>
+            ) : filteredVideos.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-neutral-200 p-6 text-center text-xs text-neutral-500 mt-2">
+                Nenhum vídeo nesta aba ou busca. Escolha outra conta ou Todas.
+              </p>
             ) : (
-              <PoolVideoPicker videos={filteredVideos} selected={selectedVideos}
-                onToggle={id => setSelectedVideos(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} />
+              <div className="mt-2">
+                <PoolVideoPicker
+                  videos={filteredVideos}
+                  selected={selectedVideos}
+                  onToggle={(id) =>
+                    setSelectedVideos((prev) =>
+                      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                    )
+                  }
+                />
+              </div>
             )}
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 shrink-0 border-t border-border p-4">
-          <button onClick={onClose} className="rounded-lg border border-border bg-card px-4 py-2 text-sm hover:bg-muted">Cancelar</button>
-          <GradientButton onClick={() => create.mutate()} disabled={!canSubmit}>
-            {create.isPending ? "Criando..." : "Criar pool"}
-          </GradientButton>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between shrink-0 border-t border-neutral-200 px-6 py-4 bg-neutral-50/50">
+          <div className="flex items-center gap-2 text-xs">
+            {!hasCover && selectedVideos.length > 0 && (
+              <span className="text-amber-700 font-medium bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                ⚠️ Selecione a Capa obrigatória
+              </span>
+            )}
+            {!hasCaption && selectedVideos.length > 0 && (
+              <span className="text-amber-700 font-medium bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                ⚠️ Digite a Legenda 1 obrigatória
+              </span>
+            )}
+            {selectedVideos.length === 0 && (
+              <span className="text-neutral-500 font-medium">Selecione ao menos 1 vídeo</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 transition-colors shadow-xs"
+            >
+              Cancelar
+            </button>
+            <GradientButton
+              onClick={() => {
+                if (!hasCover) {
+                  toast.error("A seleção de capa é obrigatória para cada pool.");
+                  return;
+                }
+                if (!hasCaption) {
+                  toast.error("A Legenda 1 é obrigatória.");
+                  return;
+                }
+                if (!hasValidAccount) {
+                  toast.error("Selecione uma conta disponível sem pool ativo.");
+                  return;
+                }
+                if (selectedVideos.length === 0) {
+                  toast.error("Selecione ao menos um vídeo para o pool.");
+                  return;
+                }
+                create.mutate();
+              }}
+              disabled={!canSubmit}
+            >
+              {create.isPending ? "Criando..." : "Criar pool"}
+            </GradientButton>
+          </div>
         </div>
       </div>
     </div>

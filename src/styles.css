@@ -10,8 +10,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Playfair Display", "Space Grotesk", ui-serif, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -52,93 +52,57 @@
 }
 
 :root {
-  --radius: 0.875rem;
+  --radius: 1rem;
 
-  /* ELITE — preto profundo + dourado */
-  --background: oklch(0.11 0.005 60);
-  --foreground: oklch(0.97 0.01 85);
-  --card: oklch(0.145 0.006 60);
-  --card-foreground: oklch(0.97 0.01 85);
-  --popover: oklch(0.16 0.008 60);
-  --popover-foreground: oklch(0.97 0.01 85);
+  /* Conteúdo Principal — Alto Contraste & Elegância Minimalista */
+  --background: #f0f1f5;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
 
-  /* Dourado como primário */
-  --primary: oklch(0.80 0.14 85);
-  --primary-foreground: oklch(0.13 0.008 60);
-  --secondary: oklch(0.20 0.008 60);
-  --secondary-foreground: oklch(0.97 0.01 85);
-  --muted: oklch(0.18 0.007 60);
-  --muted-foreground: oklch(0.66 0.02 85);
-  --accent: oklch(0.22 0.015 85);
-  --accent-foreground: oklch(0.97 0.01 85);
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.72 0.16 145);
-  --success-foreground: oklch(0.12 0.02 145);
-  --warning: oklch(0.82 0.15 85);
-  --warning-foreground: oklch(0.15 0.02 85);
+  /* Preto sólido moderno, cinza escuro chumbo e acentos da marca */
+  --primary: #09090b;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f6;
+  --secondary-foreground: #09090b;
+  --muted: #f4f4f6;
+  --muted-foreground: #4b4b55;
+  --accent: #f4f4f6;
+  --accent-foreground: #09090b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #000000;
 
-  --border: oklch(0.28 0.02 85 / 45%);
-  --input: oklch(0.28 0.02 85 / 45%);
-  --ring: oklch(0.80 0.14 85 / 55%);
+  --border: #e5e5ea;
+  --input: #e5e5ea;
+  --ring: #09090b;
 
-  --chart-1: oklch(0.80 0.14 85);
-  --chart-2: oklch(0.62 0.10 65);
-  --chart-3: oklch(0.90 0.08 90);
-  --chart-4: oklch(0.72 0.16 145);
-  --chart-5: oklch(0.55 0.05 60);
+  --chart-1: #18181b;
+  --chart-2: #3b82f6;
+  --chart-3: #15803d;
+  --chart-4: #d97706;
+  --chart-5: #6366f1;
 
-  --sidebar: oklch(0.09 0.004 60);
-  --sidebar-foreground: oklch(0.92 0.01 85);
-  --sidebar-primary: oklch(0.80 0.14 85);
-  --sidebar-primary-foreground: oklch(0.13 0.008 60);
-  --sidebar-accent: oklch(0.17 0.008 60);
-  --sidebar-accent-foreground: oklch(0.97 0.01 85);
-  --sidebar-border: oklch(0.22 0.015 85 / 60%);
-  --sidebar-ring: oklch(0.80 0.14 85 / 55%);
+  /* Sidebar — Clean Light Preto & Branco Minimalista */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #344054;
+  --sidebar-primary: #09090b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f6;
+  --sidebar-accent-foreground: #09090b;
+  --sidebar-border: #eaecf0;
+  --sidebar-ring: #09090b;
 
-  /* Gradientes dourados ELITE */
-  --gold-1: #b8860b;
-  --gold-2: #d4af37;
-  --gold-3: #f4ce7b;
-  --gold-4: #a67c00;
-  --gradient-ig: linear-gradient(135deg, #a67c00 0%, #d4af37 40%, #f4ce7b 70%, #b8860b 100%);
-  --gradient-ig-soft: linear-gradient(135deg, oklch(0.80 0.14 85 / 18%), oklch(0.72 0.12 75 / 14%) 55%, oklch(0.55 0.08 65 / 10%));
-  --shadow-glow: 0 22px 55px -20px oklch(0.80 0.14 85 / 40%), 0 8px 24px -12px oklch(0 0 0 / 60%);
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 45%), 0 12px 32px -20px oklch(0 0 0 / 65%);
-}
-
-.light {
-  --background: oklch(0.99 0.003 85);
-  --foreground: oklch(0.15 0.01 60);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 60);
-  --primary: oklch(0.62 0.14 80);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.01 85);
-  --secondary-foreground: oklch(0.15 0.01 60);
-  --muted: oklch(0.96 0.01 85);
-  --muted-foreground: oklch(0.48 0.02 85);
-  --accent: oklch(0.94 0.03 85);
-  --accent-foreground: oklch(0.15 0.01 60);
-  --destructive: oklch(0.58 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.62 0.16 145);
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.72 0.14 85);
-  --warning-foreground: oklch(0.15 0.02 85);
-  --border: oklch(0.90 0.01 85);
-  --input: oklch(0.90 0.01 85);
-  --ring: oklch(0.62 0.14 80 / 50%);
-  --sidebar: oklch(0.98 0.005 85);
-  --sidebar-foreground: oklch(0.20 0.01 60);
-  --sidebar-primary: oklch(0.62 0.14 80);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.94 0.01 85);
-  --sidebar-accent-foreground: oklch(0.20 0.01 60);
-  --sidebar-border: oklch(0.90 0.01 85);
+  /* Sombras e destaques */
+  --gradient-ig: linear-gradient(135deg, #27272a 0%, #18181b 50%, #09090b 100%);
+  --gradient-ig-soft: rgba(0, 0, 0, 0.02);
+  --shadow-glow: 0 4px 20px -4px rgba(212, 175, 55, 0.2);
+  --shadow-soft: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.03);
 }
 
 @layer base {
@@ -150,37 +114,35 @@
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "cv02","cv03","cv04","cv11";
   }
-  h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.015em; }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
 }
 
-/* Utilities — nomes mantidos para compatibilidade; agora renderizam o dourado ELITE */
+/* Utilities — Estilo Minimalista Limpo */
 @utility ig-gradient {
-  background-image: var(--gradient-ig);
+  background: #09090b;
 }
 @utility ig-gradient-text {
-  background-image: var(--gradient-ig);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: inherit;
 }
 @utility ig-gradient-border {
   position: relative;
   isolation: isolate;
 }
 @utility ig-ring {
-  box-shadow: 0 0 0 1.5px transparent, var(--shadow-glow);
+  box-shadow: 0 0 0 1.5px #27272a;
 }
 @utility card-elevated {
   background-color: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid #e5e5ea;
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.03);
 }
 @utility gold-text {
-  background-image: var(--gradient-ig);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: inherit;
 }
 
 /* Skeleton shimmer */

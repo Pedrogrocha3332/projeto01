@@ -473,10 +473,11 @@ function QueuePage() {
                             🎯 {(p.reach_count ?? 0).toLocaleString("pt-BR")} alcance
                           </span>
                         )}
-                        {/* Alerta de 0 Views / Possível restrição se publicado há mais de 2 horas */}
+                        {/* Alerta de 0 Views / Possível restrição se publicado há mais de 2 horas sem views e sem likes */}
                         {p.published_at &&
                           Date.now() - new Date(p.published_at).getTime() > 2 * 3600 * 1000 &&
-                          (p.view_count ?? 0) === 0 && (
+                          (p.view_count ?? 0) === 0 &&
+                          (p.like_count ?? 0) === 0 && (
                             <span className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
                               <AlertTriangle className="h-3 w-3" />
                               0 Views (Sem entrega / Alerta)
