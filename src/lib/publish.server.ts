@@ -220,13 +220,24 @@ const BROWSER_MIMIC_HEADERS: Record<string, string> = {
   "accept-encoding": "gzip, deflate, br",
 };
 
+function normalizeProxyUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const parts = trimmed.split(":");
+  if (parts.length === 4) {
+    const [host, port, user, pass] = parts;
+    return `http://${user}:${pass}@${host}:${port}`;
+  }
+  return `http://${trimmed}`;
+}
+
 function getGraphDispatcher(): ProxyAgent | undefined {
-  const proxyUrl = process.env.PROXY_URL?.trim();
-  if (!proxyUrl) return undefined;
+  const raw = process.env.PROXY_URL?.trim();
+  if (!raw) return undefined;
+  const proxyUrl = normalizeProxyUrl(raw);
   if (cachedProxyAgent && lastProxyUrl === proxyUrl) return cachedProxyAgent;
   try {
     const tlsOptions: ConnectionOptions = {
-      ALPNProtocols: ["h2", "http/1.1"],
       servername: "graph.instagram.com",
     };
     cachedProxyAgent = new ProxyAgent({
@@ -262,6 +273,7 @@ async function graph<T = any>(
   const timer = setTimeout(() => controller.abort(), GRAPH_TIMEOUT_MS);
   let res: Response;
   const dispatcher = getGraphDispatcher();
+  const bodyContent = method === "POST" ? form.toString() : undefined;
   try {
     const headers: Record<string, string> = {
       ...BROWSER_MIMIC_HEADERS,
@@ -270,7 +282,7 @@ async function graph<T = any>(
     const fetchImpl = dispatcher ? (undiciFetch as any) : fetch;
     res = await fetchImpl(url.toString(), {
       method,
-      body: method === "POST" ? form : undefined,
+      body: bodyContent,
       headers,
       signal: controller.signal,
       ...(dispatcher ? { dispatcher } : {}),
@@ -279,7 +291,9 @@ async function graph<T = any>(
     if (e?.name === "AbortError") {
       throw new Error(`Timeout ao chamar API do Instagram (${GRAPH_TIMEOUT_MS / 1000}s) em ${path}`);
     }
-    throw new Error(`Falha de rede ao chamar API do Instagram: ${e?.message ?? e}`);
+    const causeText = e?.cause?.message || e?.cause?.code || (e?.cause ? String(e.cause) : "");
+    const extra = causeText ? ` [causa: ${causeText}]` : "";
+    throw new Error(`Falha de rede ao chamar API do Instagram: ${e?.message ?? e}${extra}`);
   } finally {
     clearTimeout(timer);
   }

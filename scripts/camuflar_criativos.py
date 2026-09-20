@@ -28,6 +28,13 @@ import shutil
 import argparse
 import subprocess
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 def find_ffmpeg():
     """Tenta localizar o binário do FFmpeg no sistema ou via imageio_ffmpeg."""
     try:
