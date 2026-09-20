@@ -17,12 +17,23 @@ export const Route = createFileRoute("/api/public/cron/publish-scheduled")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { processScheduledPostTick, markPostFailed } = await import("@/lib/publish.server");
 
-        const { tickPublicationRounds } = await import("@/lib/rounds.server");
         let rounds: Awaited<ReturnType<typeof tickPublicationRounds>>;
         try { rounds = await tickPublicationRounds(); } catch (e) {
           return Response.json({ error: e instanceof Error ? e.message : "Erro nas rodadas" }, { status: 500 });
         }
+
+        // Se não houver rodadas reservando o painel, processa pools de rotação vencidos automaticamente
+        if (!rounds.reserved) {
+          try {
+            const { processAllDuePools } = await import("@/lib/pools.server");
+            await processAllDuePools();
+          } catch (errPools) {
+            console.error("[cron/publish-scheduled] erro ao processar pools:", errPools);
+          }
+        }
+
         const nowIso = new Date().toISOString();
+
         const publishingCutoff = new Date(Date.now() - 60_000).toISOString();
 
         // Continua os envios em processamento e inicia os posts vencidos em lotes.
