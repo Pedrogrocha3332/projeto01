@@ -341,77 +341,79 @@ function PoolsPage() {
         description="Gestão de publicação contínua em lotes e rotação circular de Reels"
       />
       <PageBody>
-        {/* CONTADORES GLASS MODERNOS (ESTILO RELÓGIO DE PAREDE / DISPLAY DIGITAL) */}
+        {/* CONTADORES MINIMALISTAS E TRANSLÚCIDOS (GLASS CLEAN) */}
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Card 1: Reels Postados */}
-          <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/95 p-4.5 text-white shadow-xl backdrop-blur-md transition-all hover:border-neutral-700 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-semibold text-neutral-400">
+          <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 bg-white/75 p-4.5 shadow-xs backdrop-blur-md transition-all hover:bg-white/95 hover:border-neutral-300 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-500">
               <span className="flex items-center gap-1.5 uppercase tracking-wider">
-                <Film className="h-3.5 w-3.5 text-[#E5B842]" /> Reels Postados
+                <Film className="h-3.5 w-3.5 text-neutral-600" /> Reels Postados
               </span>
-              <span className="rounded-full bg-neutral-800/80 px-2 py-0.5 text-[10px] font-medium text-neutral-300">
+              <span className="rounded-full bg-neutral-100 border border-neutral-200/80 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
                 Hoje
               </span>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-extrabold tracking-tight text-white">
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-neutral-900">
                 {headerStats?.publishedToday ?? 0}
               </span>
-              <span className="text-xs font-medium text-neutral-400">reels publicados</span>
+              <span className="text-xs font-medium text-neutral-500">reels publicados</span>
             </div>
-            <div className="mt-2 text-[11px] text-neutral-500 font-medium">
+            <div className="mt-2 text-[11px] text-neutral-400 font-medium">
               Ciclo dos pools: {totalPublishedReels}/{totalLimitReels} reels
             </div>
           </div>
 
           {/* Card 2: Contas Ativas (Verde) */}
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-neutral-900/95 p-4.5 text-white shadow-xl backdrop-blur-md transition-all hover:border-emerald-500/50 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-semibold text-emerald-400">
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4.5 shadow-xs backdrop-blur-md transition-all hover:bg-emerald-50/70 hover:border-emerald-300 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs font-semibold text-emerald-700">
               <span className="flex items-center gap-1.5 uppercase tracking-wider">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> Contas Ativas
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Contas Ativas
               </span>
-              <span className="rounded-full bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+              <span className="rounded-full bg-emerald-100/80 border border-emerald-300 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
                 Online
               </span>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-extrabold tracking-tight text-emerald-400">
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-emerald-600">
                 {activeAccountsCount}
               </span>
-              <span className="text-xs font-medium text-neutral-400">contas conectadas</span>
+              <span className="text-xs font-medium text-emerald-700/80">contas conectadas</span>
             </div>
-            <div className="mt-2 text-[11px] text-emerald-300/80 font-medium">
+            <div className="mt-2 text-[11px] text-emerald-600 font-medium">
               {pools.filter((p) => p.status === "active").length} pools operando normalmente
             </div>
           </div>
 
           {/* Card 3: Contas Caídas / Suspensas (Vermelho) */}
-          <div className={`relative overflow-hidden rounded-2xl border p-4.5 text-white shadow-xl backdrop-blur-md transition-all flex flex-col justify-between ${
+          <div className={`relative overflow-hidden rounded-2xl border p-4.5 shadow-xs backdrop-blur-md transition-all flex flex-col justify-between ${
             suspendedAccountsCount > 0
-              ? "border-rose-500/50 bg-neutral-900/95"
-              : "border-neutral-800 bg-neutral-900/95"
+              ? "border-rose-300 bg-rose-50/50 hover:bg-rose-50/80"
+              : "border-neutral-200/80 bg-white/75 hover:bg-white/95"
           }`}>
-            <div className="flex items-center justify-between text-xs font-semibold text-rose-400">
+            <div className={`flex items-center justify-between text-xs font-semibold ${
+              suspendedAccountsCount > 0 ? "text-rose-700" : "text-neutral-500"
+            }`}>
               <span className="flex items-center gap-1.5 uppercase tracking-wider">
-                <AlertTriangle className="h-3.5 w-3.5 text-rose-400" /> Contas Suspensas
+                <AlertTriangle className={`h-3.5 w-3.5 ${suspendedAccountsCount > 0 ? "text-rose-600" : "text-neutral-400"}`} /> Contas Suspensas
               </span>
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 suspendedAccountsCount > 0
-                  ? "bg-rose-950/60 border border-rose-500/40 text-rose-300"
-                  : "bg-neutral-800 text-neutral-400"
+                  ? "bg-rose-100 border border-rose-300 text-rose-800"
+                  : "bg-neutral-100 border border-neutral-200/80 text-neutral-500"
               }`}>
                 {suspendedAccountsCount > 0 ? "Alerta Meta" : "Estável"}
               </span>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className={`font-mono text-3xl font-extrabold tracking-tight ${
-                suspendedAccountsCount > 0 ? "text-rose-400" : "text-neutral-400"
+                suspendedAccountsCount > 0 ? "text-rose-600" : "text-neutral-400"
               }`}>
                 {suspendedAccountsCount}
               </span>
-              <span className="text-xs font-medium text-neutral-400">contas restritas</span>
+              <span className="text-xs font-medium text-neutral-500">contas restritas</span>
             </div>
-            <div className="mt-2 text-[11px] text-neutral-500 font-medium">
+            <div className="mt-2 text-[11px] text-neutral-400 font-medium">
               {suspendedAccountsCount > 0
                 ? "Circuit Breaker ativado para blindagem"
                 : "Zero bloqueios ou restrições"}
@@ -421,21 +423,21 @@ function PoolsPage() {
           {/* Card 4: Atalho para a Fila */}
           <Link
             to="/queue"
-            className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/95 p-4.5 text-white shadow-xl backdrop-blur-md transition-all hover:border-[#E5B842]/50 hover:bg-neutral-900 flex flex-col justify-between"
+            className="group relative overflow-hidden rounded-2xl border border-neutral-200/80 bg-white/75 p-4.5 shadow-xs backdrop-blur-md transition-all hover:bg-white hover:border-[#E5B842] flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between text-xs font-semibold text-neutral-400 group-hover:text-[#E5B842] transition-colors">
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-500 group-hover:text-neutral-900 transition-colors">
               <span className="flex items-center gap-1.5 uppercase tracking-wider">
-                <Clock className="h-3.5 w-3.5 text-[#E5B842]" /> Fila de Postagem
+                <Clock className="h-3.5 w-3.5 text-neutral-500 group-hover:text-[#D97706]" /> Fila de Postagem
               </span>
-              <ArrowUpRight className="h-3.5 w-3.5 text-neutral-500 group-hover:text-[#E5B842] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              <ArrowUpRight className="h-3.5 w-3.5 text-neutral-400 group-hover:text-neutral-900 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-extrabold tracking-tight text-[#E5B842]">
+              <span className="font-mono text-3xl font-extrabold tracking-tight text-neutral-900 group-hover:text-[#D97706] transition-colors">
                 {headerStats?.queueCount ?? 0}
               </span>
-              <span className="text-xs font-medium text-neutral-400">reels na fila</span>
+              <span className="text-xs font-medium text-neutral-500">reels na fila</span>
             </div>
-            <div className="mt-2 text-[11px] text-neutral-400 font-medium group-hover:text-neutral-200 transition-colors">
+            <div className="mt-2 text-[11px] text-neutral-400 font-medium group-hover:text-neutral-600 transition-colors">
               Ver agendamentos em tempo real →
             </div>
           </Link>
