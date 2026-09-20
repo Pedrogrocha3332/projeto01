@@ -204,7 +204,7 @@ async function signedUrl(storagePath: string): Promise<string> {
   }
 }
 
-import { ProxyAgent } from "undici";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 import type { ConnectionOptions } from "tls";
 
 let cachedProxyAgent: ProxyAgent | null = null;
@@ -267,7 +267,8 @@ async function graph<T = any>(
       ...BROWSER_MIMIC_HEADERS,
       ...(method === "POST" ? { "content-type": "application/x-www-form-urlencoded" } : {}),
     };
-    res = await fetch(url.toString(), {
+    const fetchImpl = dispatcher ? (undiciFetch as any) : fetch;
+    res = await fetchImpl(url.toString(), {
       method,
       body: method === "POST" ? form : undefined,
       headers,

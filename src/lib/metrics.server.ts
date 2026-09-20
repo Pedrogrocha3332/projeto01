@@ -1,6 +1,6 @@
 // Coletor de métricas em tempo real (Reels Views, Reach, Likes) via Meta Graph API.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ProxyAgent } from "undici";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 import type { ConnectionOptions } from "tls";
 
 const GRAPH = "https://graph.instagram.com/v21.0";
@@ -52,7 +52,8 @@ async function graphGet<T = any>(path: string, token: string, params: Record<str
   const dispatcher = getProxyDispatcher();
 
   try {
-    const res = await fetch(url.toString(), {
+    const fetchImpl = dispatcher ? (undiciFetch as any) : fetch;
+    const res = await fetchImpl(url.toString(), {
       method: "GET",
       headers: BROWSER_MIMIC_HEADERS,
       signal: controller.signal,
